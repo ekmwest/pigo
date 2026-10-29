@@ -1,4 +1,4 @@
-package upgrade
+package update
 
 import (
 	"errors"
@@ -17,7 +17,7 @@ func replaceExecutable(exe string, data []byte, windows bool) error {
 		mode = fi.Mode().Perm()
 	}
 
-	tmp, err := os.CreateTemp(filepath.Dir(exe), ".pigo-upgrade-*")
+	tmp, err := os.CreateTemp(filepath.Dir(exe), ".pigo-update-*")
 	if err != nil {
 		return replaceError(exe, err, windows)
 	}
@@ -49,7 +49,7 @@ func replaceExecutable(exe string, data []byte, windows bool) error {
 	if err := os.Remove(old); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		// The temp file was just created in this folder, so it isn't the
 		// folder's permissions: .old is the exe of a pigo started before
-		// the previous upgrade.
+		// the previous update.
 		return fmt.Errorf("an older pigo is still running (e.g. pigo serve); close it and try again: %w", err)
 	}
 	if err := os.Rename(exe, old); err != nil {
@@ -70,5 +70,5 @@ func replaceError(exe string, err error, windows bool) error {
 	if windows {
 		return fmt.Errorf("no permission to replace %s; run the command from a terminal opened with \"Run as administrator\": %w", exe, err)
 	}
-	return fmt.Errorf("no permission to replace %s; run \"sudo pigo upgrade\", or reinstall with the install script (it installs to ~/.local/bin): %w", exe, err)
+	return fmt.Errorf("no permission to replace %s; run \"sudo pigo update\", or reinstall with the install script (it installs to ~/.local/bin): %w", exe, err)
 }

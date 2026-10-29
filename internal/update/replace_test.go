@@ -1,4 +1,4 @@
-package upgrade
+package update
 
 import (
 	"os"
@@ -24,10 +24,10 @@ func readFile(t *testing.T, name string) string {
 	return string(b)
 }
 
-// assertNoTempFiles checks that no .pigo-upgrade-* file is left in dir.
+// assertNoTempFiles checks that no .pigo-update-* file is left in dir.
 func assertNoTempFiles(t *testing.T, dir string) {
 	t.Helper()
-	matches, err := filepath.Glob(filepath.Join(dir, ".pigo-upgrade-*"))
+	matches, err := filepath.Glob(filepath.Join(dir, ".pigo-update-*"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +110,7 @@ func TestReplaceExecutableMissingDir(t *testing.T) {
 }
 
 func TestReplaceErrorPermissionHint(t *testing.T) {
-	if err := replaceError("/usr/local/bin/pigo", os.ErrPermission, false); !strings.Contains(err.Error(), "sudo pigo upgrade") {
+	if err := replaceError("/usr/local/bin/pigo", os.ErrPermission, false); !strings.Contains(err.Error(), "sudo pigo update") {
 		t.Errorf("unix hint missing: %v", err)
 	}
 	if err := replaceError(`C:\Program Files\pigo\pigo.exe`, os.ErrPermission, true); !strings.Contains(err.Error(), "Run as administrator") {

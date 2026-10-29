@@ -1,4 +1,4 @@
-package upgrade
+package update
 
 import (
 	"errors"
@@ -23,8 +23,8 @@ const (
 
 func Command(v string) cli.Command {
 	return cli.Command{
-		Name:    "upgrade",
-		Summary: "Upgrade pigo to the latest release",
+		Name:    "update",
+		Summary: "Update pigo to the latest release",
 		Help:    printHelp,
 		Run: func(args []string, stdout, stderr io.Writer) int {
 			return run(v, args, stdout, stderr)
@@ -33,7 +33,7 @@ func Command(v string) cli.Command {
 }
 
 func printHelp(w io.Writer) {
-	fmt.Fprint(w, `Usage: pigo upgrade
+	fmt.Fprint(w, `Usage: pigo update
 
 Replace pigo with the latest release from GitHub.
 The download is verified against the release checksums.
@@ -41,7 +41,7 @@ The download is verified against the release checksums.
 }
 
 func run(v string, args []string, stdout, stderr io.Writer) int {
-	fs := flag.NewFlagSet("upgrade", flag.ContinueOnError)
+	fs := flag.NewFlagSet("update", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {} // we print help ourselves, so it goes to the right stream
 	if err := fs.Parse(args); err != nil {
@@ -54,7 +54,7 @@ func run(v string, args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	if fs.NArg() > 0 {
-		fmt.Fprintln(stderr, "pigo upgrade: unexpected arguments")
+		fmt.Fprintln(stderr, "pigo update: unexpected arguments")
 		printHelp(stderr)
 		return 2
 	}
@@ -71,19 +71,19 @@ func run(v string, args []string, stdout, stderr io.Writer) int {
 	if v != "dev" {
 		exe, err := executable()
 		if err != nil {
-			fmt.Fprintf(stderr, "pigo upgrade: %v\n", err)
+			fmt.Fprintf(stderr, "pigo update: %v\n", err)
 			return 1
 		}
 		opts.exe = exe
 	}
-	if err := upgrade(opts, stdout); err != nil {
-		fmt.Fprintf(stderr, "pigo upgrade: %v\n", err)
+	if err := update(opts, stdout); err != nil {
+		fmt.Fprintf(stderr, "pigo update: %v\n", err)
 		return 1
 	}
 	return 0
 }
 
-// options holds everything upgrade depends on, so tests can point it at a
+// options holds everything update depends on, so tests can point it at a
 // local server and a temporary executable.
 type options struct {
 	current     string // version of the running pigo
@@ -95,12 +95,12 @@ type options struct {
 	client      *http.Client
 }
 
-func upgrade(opts options, stdout io.Writer) error {
+func update(opts options, stdout io.Writer) error {
 	if opts.current == "dev" {
-		return errors.New("this is a development build; install a release with the install script to use upgrade")
+		return errors.New("this is a development build; install a release with the install script to use update")
 	}
 
-	// An upgrade on windows leaves the replaced exe behind as .old, because
+	// An update on windows leaves the replaced exe behind as .old, because
 	// a running exe can't be deleted. By now that process has usually exited.
 	os.Remove(opts.exe + ".old")
 
@@ -141,7 +141,7 @@ func upgrade(opts options, stdout io.Writer) error {
 	if err := replaceExecutable(opts.exe, bin, opts.goos == "windows"); err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "upgraded %s -> %s\n", opts.current, latest)
+	fmt.Fprintf(stdout, "updated %s -> %s\n", opts.current, latest)
 	return nil
 }
 

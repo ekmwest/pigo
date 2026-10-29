@@ -1,4 +1,4 @@
-package upgrade
+package update
 
 import (
 	"bytes"
@@ -19,8 +19,8 @@ func TestRun(t *testing.T) {
 		wantStdout string // substring
 		wantStderr string // substring; "" means stderr must be empty
 	}{
-		{name: "dev build refused", version: "dev", wantCode: 1, wantStderr: "pigo upgrade: this is a development build"},
-		{name: "-h prints help", version: "v1.2.3", args: []string{"-h"}, wantCode: 0, wantStdout: "Usage: pigo upgrade"},
+		{name: "dev build refused", version: "dev", wantCode: 1, wantStderr: "pigo update: this is a development build"},
+		{name: "-h prints help", version: "v1.2.3", args: []string{"-h"}, wantCode: 0, wantStdout: "Usage: pigo update"},
 		{name: "extra argument", version: "v1.2.3", args: []string{"extra"}, wantCode: 2, wantStderr: "unexpected arguments"},
 		{name: "unknown flag", version: "v1.2.3", args: []string{"-x"}, wantCode: 2, wantStderr: "flag provided but not defined: -x"},
 	}
@@ -102,15 +102,15 @@ func linuxRelease(t *testing.T, tag string) release {
 	}
 }
 
-func TestUpgrade(t *testing.T) {
+func TestUpdate(t *testing.T) {
 	srv := linuxRelease(t, "v0.0.2").serve(t)
 	opts := testOptions(t, srv, "v0.0.1", "linux", "amd64")
 
 	var stdout bytes.Buffer
-	if err := upgrade(opts, &stdout); err != nil {
+	if err := update(opts, &stdout); err != nil {
 		t.Fatal(err)
 	}
-	if got, want := stdout.String(), "upgraded v0.0.1 -> v0.0.2\n"; got != want {
+	if got, want := stdout.String(), "updated v0.0.1 -> v0.0.2\n"; got != want {
 		t.Errorf("stdout = %q, want %q", got, want)
 	}
 	if got := readFile(t, opts.exe); got != "new binary" {
@@ -118,7 +118,7 @@ func TestUpgrade(t *testing.T) {
 	}
 }
 
-func TestUpgradeWindows(t *testing.T) {
+func TestUpdateWindows(t *testing.T) {
 	archive := makeZip(t, archiveEntry{name: "pigo.exe", body: "new exe"})
 	srv := release{
 		tag: "v0.0.2",
@@ -130,7 +130,7 @@ func TestUpgradeWindows(t *testing.T) {
 	opts := testOptions(t, srv, "v0.0.1", "windows", "arm64")
 
 	var stdout bytes.Buffer
-	if err := upgrade(opts, &stdout); err != nil {
+	if err := update(opts, &stdout); err != nil {
 		t.Fatal(err)
 	}
 	if got := readFile(t, opts.exe); got != "new exe" {
@@ -141,13 +141,13 @@ func TestUpgradeWindows(t *testing.T) {
 	}
 }
 
-func TestUpgradeAlreadyUpToDate(t *testing.T) {
+func TestUpdateAlreadyUpToDate(t *testing.T) {
 	srv := linuxRelease(t, "v0.0.2").serve(t)
 	opts := testOptions(t, srv, "v0.0.2", "linux", "amd64")
 	writeFile(t, opts.exe+".old", "leftover")
 
 	var stdout bytes.Buffer
-	if err := upgrade(opts, &stdout); err != nil {
+	if err := update(opts, &stdout); err != nil {
 		t.Fatal(err)
 	}
 	if got, want := stdout.String(), "pigo is already up to date (v0.0.2)\n"; got != want {
@@ -161,7 +161,7 @@ func TestUpgradeAlreadyUpToDate(t *testing.T) {
 	}
 }
 
-func TestUpgradeErrors(t *testing.T) {
+func TestUpdateErrors(t *testing.T) {
 	tests := []struct {
 		name    string
 		release func(t *testing.T) release
@@ -226,7 +226,7 @@ func TestUpgradeErrors(t *testing.T) {
 			opts := testOptions(t, srv, tt.current, "linux", tt.goarch)
 
 			var stdout bytes.Buffer
-			err := upgrade(opts, &stdout)
+			err := update(opts, &stdout)
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Fatalf("err = %v, want it to contain %q", err, tt.wantErr)
 			}
