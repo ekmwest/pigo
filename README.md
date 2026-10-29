@@ -9,3 +9,7 @@ windows (powershell):
 macos and linux:
 
     curl -fsSL https://raw.githubusercontent.com/ekmwest/pigo/main/scripts/install.sh | sh
+
+## Upgrade
+
+    pigo upgrade
