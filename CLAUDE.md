@@ -16,6 +16,13 @@ pigo is a CLI tool written in Go.
     - Live reload is always on: browsers refresh when any file in the served folder is added, changed or deleted. Dotfiles and editor temp files are ignored. `--no-reload` turns it off.
     - Don't write to stdout or stderr in response to a file change or a reload (including request logs for the reload stream). If output is redirected to a file inside the served folder, each write is itself a change, causing an endless reload loop.
     - Caching is disabled on purpose: responses send `Cache-Control: no-store`, and conditional request headers (`If-Modified-Since`, `If-None-Match`) are ignored. Browsers cache by URL, and `localhost:<port>` points at a different folder every time serve is restarted elsewhere, so a revalidated copy (a 304) can be a page from another folder.
+- `pigo copy owner/repo [folder]`: copies the files of a GitHub repo (default branch, no git history) into a folder, like a project template (`internal/repocopy`).
+    - Input is only `owner/repo`; URLs, branches and subpaths are rejected. Without a folder, the current folder is used; a missing folder is created.
+    - The target must be empty (hidden files count). Otherwise copy refuses and changes nothing.
+    - Downloads `https://api.github.com/repos/owner/repo/tarball` once and extracts it while streaming (stdlib `archive/tar` + `os.Root`; no temp archive, no external tar). The archive's top-level folder is stripped.
+    - Root-only excludes (LICENSE, README.md, .github, …) are the `excluded` list in `internal/repocopy/repocopy.go`.
+    - Only regular files and directories are extracted; a path that would land outside the target aborts the copy. A 404 means the repo doesn't exist or is private.
+    - On any failure (including Ctrl+C), everything written is removed, so the folder is left as it was.
 - `pigo version`: prints the version. It is set at build time with `-ldflags "-X main.version=vX.Y.Z"` (the `version` variable in `main.go`; release builds inject the git tag, `v` included). Without it, the output is `dev`.
 - `pigo help`: prints help documentation.
 - `pigo update`: self-updates the cli from the latest GitHub release (`releases/latest` tag; refuses on `dev`; plain inequality, no semver). Downloads the archive for GOOS/GOARCH and `checksums.txt` for that exact tag, verifies the sha256, and swaps the executable via a temp file next to it. On windows the running exe is renamed to `pigo.exe.old` first; a leftover `.old` is removed on the next update run.
