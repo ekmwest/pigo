@@ -31,6 +31,8 @@ func TestRun(t *testing.T) {
 		{name: "help copy", args: []string{"help", "copy"}, wantCode: 0, wantStdout: "Usage: pigo copy"},
 		{name: "help build", args: []string{"help", "build"}, wantCode: 0, wantStdout: "Usage: pigo build"},
 		{name: "help dev", args: []string{"help", "dev"}, wantCode: 0, wantStdout: "Usage: pigo dev"},
+		{name: "help upgrade", args: []string{"help", "upgrade"}, wantCode: 0, wantStdout: "Also available as: pigo update"},
+		{name: "update alias", args: []string{"update", "--help"}, wantCode: 0, wantStdout: "Usage: pigo upgrade"},
 		{name: "unknown command", args: []string{"bogus"}, wantCode: 2, wantStderr: `unknown command "bogus"`},
 		{name: "unknown command shows usage", args: []string{"bogus"}, wantCode: 2, wantStderr: usageStart},
 	}

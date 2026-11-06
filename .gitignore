@@ -1,6 +1,7 @@
 # Build output
 /pigo
 /pigo.exe
+/pigo.exe~
 /dist/
 
 # Go test and coverage output

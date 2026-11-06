@@ -37,6 +37,8 @@ func printHelp(w io.Writer) {
 
 Replace pigo with the latest release from GitHub.
 The download is verified against the release checksums.
+
+Also available as: pigo update
 `)
 }
 
