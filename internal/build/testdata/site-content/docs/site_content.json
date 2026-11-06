@@ -1,0 +1,26 @@
+[
+    {
+        "title": "B",
+        "description": "{{ description }}",
+        "url": "/b.html",
+        "content": "B page"
+    },
+    {
+        "title": "C",
+        "description": "",
+        "url": "/b.i/c.html",
+        "content": ""
+    },
+    {
+        "title": "Guide",
+        "description": "",
+        "url": "/docs/guide.html",
+        "content": "Step oneStep two"
+    },
+    {
+        "title": "Home",
+        "description": "The home page & more",
+        "url": "/index.html",
+        "content": "Welcome Hello \"world\" and friends."
+    }
+]

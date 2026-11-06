@@ -1,0 +1,5 @@
+deleted docs/gone/a.html
+deleted docs/gone/deeper/b.html
+deleted docs/keep/stale.css
+deleted docs/old.html
+built docs/ in N ms (3 written, 4 deleted)

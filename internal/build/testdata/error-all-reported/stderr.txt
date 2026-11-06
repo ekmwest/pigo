@@ -1,0 +1,5 @@
+src/a.html: missing layout "missing.html" in src/_layouts
+src/a.html: missing include "nav.html" in src/_includes
+src/b.html and src/b.md both build docs/b.html
+src/b.md: frontmatter line 2: expected "key: value", got "title no colon"
+pigo build: 4 errors, nothing written

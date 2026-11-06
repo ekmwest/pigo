@@ -1,0 +1,2 @@
+src/index.html: include "../secret.html" is outside src/_includes
+pigo build: 1 error, nothing written

@@ -1,0 +1,3 @@
+src/index.html: include "card.html" has invalid props { src: 'single.png' }: expected a double-quoted value for src (props look like { key: "value" })
+src/index.html: include "card.html" has invalid props { src: "a.png" alt: "b" }: expected "," or "}" after the value of src (props look like { key: "value" })
+pigo build: 2 errors, nothing written

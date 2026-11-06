@@ -1,0 +1,2 @@
+src/index.html: layout "base.html" has no {{ content }}
+pigo build: 1 error, nothing written

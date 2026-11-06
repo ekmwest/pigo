@@ -1,0 +1,3 @@
+src/index.html: missing include "header.html" in src/_includes
+src/index.html: missing include "icon.svg" in src/_includes (included from card.html)
+pigo build: 2 errors, nothing written

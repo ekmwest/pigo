@@ -1,0 +1,13 @@
+---
+title: Home
+meta-title: 'Home: the start'
+sub_title: "Welcome"
+empty:
+---
+<title>{{ meta-title }}</title>
+<h1>{{title}}</h1>
+<h2>{{ sub_title || Fallback }}</h2>
+<p>{{ empty || Nothing here }}</p>
+<p class="{{ next || }}">{{ unknown }}</p>
+<p>{{ missing || first || second }}</p>
+<p>{{ title || ignored }}</p>

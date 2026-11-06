@@ -1,0 +1,2 @@
+src/index.html: include cycle: a.html -> b.html -> a.html
+pigo build: 1 error, nothing written

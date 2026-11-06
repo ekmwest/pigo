@@ -1,0 +1,20 @@
+[
+    {
+        "title": "A post: part 1",
+        "description": "",
+        "url": "/blog/post.html",
+        "content": ""
+    },
+    {
+        "title": "Home",
+        "description": "",
+        "url": "/index.html",
+        "content": ""
+    },
+    {
+        "title": "",
+        "description": "",
+        "url": "/plain.html",
+        "content": ""
+    }
+]
