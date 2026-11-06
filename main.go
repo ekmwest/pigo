@@ -43,6 +43,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 	switch args[0] {
 	case "-h", "-help", "--help":
 		args = []string{"help"}
+	case "-v", "--version":
+		args = []string{"version"}
 	case "update":
 		args = append([]string{"upgrade"}, args[1:]...)
 	}

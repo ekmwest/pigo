@@ -15,7 +15,7 @@ func TestRun(t *testing.T) {
 		wantStderr string // substring; "" means stderr must be empty
 	}{
 		{name: "prints version", args: nil, wantCode: 0, wantStdout: "1.2.3\n"},
-		{name: "-h prints help", args: []string{"-h"}, wantCode: 0, wantStdout: "Usage: pigo version\n\nPrint the version of pigo.\n"},
+		{name: "-h prints help", args: []string{"-h"}, wantCode: 0, wantStdout: "Usage: pigo version\n\nPrint the version of pigo.\n\nAlso available as: pigo -v, pigo --version\n"},
 		{name: "extra argument", args: []string{"extra"}, wantCode: 2, wantStderr: "unexpected arguments"},
 		{name: "unknown flag", args: []string{"-x"}, wantCode: 2, wantStderr: "flag provided but not defined: -x"},
 	}

@@ -24,6 +24,8 @@ func printHelp(w io.Writer) {
 	fmt.Fprint(w, `Usage: pigo version
 
 Print the version of pigo.
+
+Also available as: pigo -v, pigo --version
 `)
 }
 
