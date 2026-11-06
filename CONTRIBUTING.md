@@ -48,6 +48,11 @@ Go caches builds, so when nothing has changed this takes a fraction of a second.
 
 ## Releasing
 
+Find latest version:
+
+    git fetch --tags
+    git describe --tags --abbrev=0
+
 Push a version tag. The github workflow (`.github/workflows/release.yml`) will build and publish it.
 
     git tag v0.1.0
