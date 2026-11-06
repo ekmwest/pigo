@@ -49,6 +49,9 @@ func TestScan(t *testing.T) {
 		".cache/x/y.html": "y",
 		"index.html~":     "backup",
 		"sub/a.css.swp":   "swap",
+
+		"node_modules/pkg/index.js": "pkg",
+		"sub/node_modules/x.js":     "x",
 	})
 
 	files, err := scan(dir)
@@ -175,6 +178,8 @@ func TestWatch(t *testing.T) {
 			".git/index":     "x",
 			"index.html.swp": "x",
 			"index.html~":    "x",
+
+			"node_modules/pkg/index.js": "x",
 		})
 		expectChanges(t, changes, 0, 10*interval)
 	})

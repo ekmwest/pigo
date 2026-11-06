@@ -73,6 +73,12 @@ func scan(dir string) (map[string]fileState, error) {
 			}
 			return nil
 		}
+		if path != dir && d.IsDir() && d.Name() == "node_modules" {
+			// These trees can hold tens of thousands of files, and every one
+			// would be stat'ed on every poll. They're still served, just not
+			// watched.
+			return filepath.SkipDir
+		}
 		if !d.Type().IsRegular() {
 			return nil
 		}
