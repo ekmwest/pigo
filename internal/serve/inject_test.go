@@ -58,7 +58,7 @@ func TestInjectReload(t *testing.T) {
 		{name: "html without </body>", path: "/page.htm", wantStatus: http.StatusOK, wantScript: true},
 		{name: "css", path: "/style.css", wantStatus: http.StatusOK},
 		{name: "text that looks like html", path: "/a.txt", wantStatus: http.StatusOK},
-		{name: "not found", path: "/missing.html", wantStatus: http.StatusNotFound},
+		{name: "not found without 404.html", path: "/missing.html", wantStatus: http.StatusNotFound},
 		{name: "head", method: http.MethodHead, path: "/", wantStatus: http.StatusOK},
 		{
 			name:       "if-modified-since is ignored",
@@ -107,6 +107,26 @@ func TestInjectReload(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestInjectReloadNotFoundPage(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{"404.html": "<body>not found</body>"})
+	h := injectReload(NewHandler(dir, log.New(io.Discard, "", 0), LogAll))
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/missing", nil))
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+	body := rec.Body.String()
+	if want := "<body>not found" + reloadScript + "</body>"; body != want {
+		t.Errorf("body = %q, want %q", body, want)
+	}
+	if got := rec.Header().Get("Content-Length"); got != strconv.Itoa(len(body)) {
+		t.Errorf("Content-Length = %s, body is %d bytes", got, len(body))
 	}
 }
 

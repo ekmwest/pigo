@@ -13,6 +13,8 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -191,7 +193,7 @@ func Serve(ctx context.Context, ln net.Listener, h http.Handler, stdout io.Write
 // directory listings, and logs requests to logger as mode says.
 func NewHandler(dir string, logger *log.Logger, mode RequestLog) http.Handler {
 	files := http.FileServer(noListingFS{http.Dir(dir)})
-	return logRequests(logger, mode, noCache(hideDotfiles(files)))
+	return logRequests(logger, mode, noCache(notFoundPage(dir, hideDotfiles(files))))
 }
 
 func logRequests(logger *log.Logger, mode RequestLog, next http.Handler) http.Handler {
@@ -228,6 +230,54 @@ func noCache(next http.Handler) http.Handler {
 		r.Header.Del("If-None-Match")
 		next.ServeHTTP(w, r)
 	})
+}
+
+// notFoundPage answers every 404 from next with dir/404.html, like GitHub
+// Pages. It intercepts the status instead of checking paths itself, so it
+// covers missing files, hidden dotfiles and folders without an index alike.
+// The file is read on each 404 so edits show up without a restart.
+func notFoundPage(dir string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(&notFoundWriter{ResponseWriter: w, dir: dir, head: r.Method == http.MethodHead}, r)
+	})
+}
+
+type notFoundWriter struct {
+	http.ResponseWriter
+	dir      string
+	head     bool
+	replaced bool // the 404 page was sent; next's own body is discarded
+}
+
+func (w *notFoundWriter) WriteHeader(status int) {
+	if status != http.StatusNotFound {
+		w.ResponseWriter.WriteHeader(status)
+		return
+	}
+	page, err := os.ReadFile(filepath.Join(w.dir, "404.html"))
+	if err != nil {
+		w.ResponseWriter.WriteHeader(status)
+		return
+	}
+	h := w.Header()
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Content-Length", strconv.Itoa(len(page)))
+	// http.FileServer drops Cache-Control on errors, but this is a page
+	// that may differ after a restart in another folder, like any other.
+	h.Set("Cache-Control", "no-store")
+	h.Del("X-Content-Type-Options")
+	w.ResponseWriter.WriteHeader(status)
+	if !w.head {
+		w.ResponseWriter.Write(page)
+	}
+	w.replaced = true
+}
+
+func (w *notFoundWriter) Write(p []byte) (int, error) {
+	if w.replaced {
+		return len(p), nil
+	}
+	return w.ResponseWriter.Write(p)
 }
 
 // hideDotfiles keeps files like .git/ and .env from being exposed by accident.

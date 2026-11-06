@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -271,5 +272,78 @@ func TestHandlerLogFailed(t *testing.T) {
 	}
 	if got, want := logs.String(), "GET /missing 404\n"; got != want {
 		t.Errorf("log = %q, want %q", got, want)
+	}
+}
+
+func TestNotFoundPage(t *testing.T) {
+	const page = "<html><body>custom not found</body></html>"
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"404.html":    page,
+		".env":        "SECRET=1",
+		"empty/b.txt": "b",
+	})
+
+	tests := []struct {
+		name       string
+		method     string
+		path       string
+		wantStatus int
+		wantBody   string
+	}{
+		{name: "missing file", path: "/missing", wantStatus: http.StatusNotFound, wantBody: page},
+		{name: "folder without index", path: "/empty/", wantStatus: http.StatusNotFound, wantBody: page},
+		{name: "dotfile", path: "/.env", wantStatus: http.StatusNotFound, wantBody: page},
+		{name: "head", method: http.MethodHead, path: "/missing", wantStatus: http.StatusNotFound},
+		{name: "404.html itself", path: "/404.html", wantStatus: http.StatusOK, wantBody: page},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			method := tt.method
+			if method == "" {
+				method = http.MethodGet
+			}
+			var logs bytes.Buffer
+			h := NewHandler(dir, log.New(&logs, "", 0), LogAll)
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, httptest.NewRequest(method, tt.path, nil))
+
+			if rec.Code != tt.wantStatus {
+				t.Errorf("status = %d, want %d", rec.Code, tt.wantStatus)
+			}
+			if got := rec.Body.String(); got != tt.wantBody {
+				t.Errorf("body = %q, want %q", got, tt.wantBody)
+			}
+			if got := rec.Header().Get("Content-Type"); got != "text/html; charset=utf-8" {
+				t.Errorf("Content-Type = %q, want %q", got, "text/html; charset=utf-8")
+			}
+			if got := rec.Header().Get("Content-Length"); got != strconv.Itoa(len(page)) {
+				t.Errorf("Content-Length = %q, want %d", got, len(page))
+			}
+			if got := rec.Header().Get("Cache-Control"); got != "no-store" {
+				t.Errorf("Cache-Control = %q, want %q", got, "no-store")
+			}
+			wantLog := fmt.Sprintf("%s %s %d\n", method, tt.path, tt.wantStatus)
+			if logs.String() != wantLog {
+				t.Errorf("log = %q, want %q", logs.String(), wantLog)
+			}
+		})
+	}
+}
+
+func TestNotFoundWithoutPage(t *testing.T) {
+	h := NewHandler(t.TempDir(), log.New(io.Discard, "", 0), LogAll)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/missing", nil))
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want %d", rec.Code, http.StatusNotFound)
+	}
+	if got, want := rec.Body.String(), "404 page not found\n"; got != want {
+		t.Errorf("body = %q, want %q", got, want)
+	}
+	if got := rec.Header().Get("Content-Type"); !strings.HasPrefix(got, "text/plain") {
+		t.Errorf("Content-Type = %q, want text/plain", got)
 	}
 }

@@ -23,7 +23,8 @@ const reloadScript = `<script>
 </script>
 `
 
-// injectReload adds reloadScript to full HTML responses. Everything else,
+// injectReload adds reloadScript to full HTML responses and HTML 404 pages,
+// so a page that is missing now reloads once it exists. Everything else,
 // including partial (206) responses, passes through unchanged.
 func injectReload(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -42,6 +43,7 @@ func injectReload(next http.Handler) http.Handler {
 type injectWriter struct {
 	http.ResponseWriter
 	wroteHeader bool
+	status      int
 	inject      bool
 	buf         bytes.Buffer
 }
@@ -51,7 +53,8 @@ func (w *injectWriter) WriteHeader(status int) {
 		return
 	}
 	w.wroteHeader = true
-	w.inject = status == http.StatusOK && strings.HasPrefix(w.Header().Get("Content-Type"), "text/html")
+	w.status = status
+	w.inject = (status == http.StatusOK || status == http.StatusNotFound) && strings.HasPrefix(w.Header().Get("Content-Type"), "text/html")
 	if !w.inject {
 		w.ResponseWriter.WriteHeader(status)
 	}
@@ -76,7 +79,7 @@ func (w *injectWriter) finish() {
 	h.Set("Content-Length", strconv.Itoa(len(body)))
 	// Byte ranges of the file on disk don't match the modified body.
 	h.Del("Accept-Ranges")
-	w.ResponseWriter.WriteHeader(http.StatusOK)
+	w.ResponseWriter.WriteHeader(w.status)
 	w.ResponseWriter.Write(body)
 }
 
