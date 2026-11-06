@@ -23,6 +23,8 @@ var update = flag.Bool("update", false, "rewrite the expected output of the gold
 //   - stderr.txt, if present, makes it an error case: build must fail
 //     with that output and leave docs/ exactly as before/.
 //   - stdout.txt is the expected output, with the time as "N ms".
+//   - src-after/ (optional) is the expected src/ after the build; without
+//     it, src/ must be unchanged.
 func TestGolden(t *testing.T) {
 	entries, err := os.ReadDir("testdata")
 	if err != nil {
@@ -48,6 +50,7 @@ func testGolden(t *testing.T, caseDir string) {
 
 	var stdout, stderr bytes.Buffer
 	code := buildAndPrint(dir, &stdout, &stderr)
+	compareSrc(t, caseDir, filepath.Join(dir, "src"))
 
 	stderrFile := filepath.Join(caseDir, "stderr.txt")
 	if exists(stderrFile) {
@@ -102,6 +105,30 @@ func testGolden(t *testing.T, caseDir string) {
 		if _, ok := wantTree[name]; !ok {
 			t.Errorf("unexpected docs/%s", name)
 		}
+	}
+}
+
+// compareSrc checks src against the case's src-after/, or src/ if there is
+// none. With -update, src-after/ is written only if src changed.
+func compareSrc(t *testing.T, caseDir, src string) {
+	t.Helper()
+	got := readTree(t, src)
+	after := filepath.Join(caseDir, "src-after")
+	if *update {
+		if err := os.RemoveAll(after); err != nil {
+			t.Fatal(err)
+		}
+		if !maps.Equal(got, readTree(t, filepath.Join(caseDir, "src"))) {
+			copyTree(t, src, after)
+		}
+		return
+	}
+	want := filepath.Join(caseDir, "src")
+	if exists(after) {
+		want = after
+	}
+	if wantTree := readTree(t, want); !maps.Equal(got, wantTree) {
+		t.Errorf("src/ after build:\n got %v\nwant %v", got, wantTree)
 	}
 }
 

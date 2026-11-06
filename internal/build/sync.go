@@ -133,6 +133,33 @@ func deleteStale(docs string, s *site) ([]string, error) {
 	return deleted, nil
 }
 
+// copyCNAMEToSrc copies docs/CNAME to src/CNAME if src has none, so that
+// sites whose custom domain only lives in docs/ get it into their source.
+// An existing src/CNAME is never overwritten.
+func copyCNAMEToSrc(src, docs string) (bool, error) {
+	from := filepath.Join(docs, "CNAME")
+	info, err := os.Lstat(from)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if !info.Mode().IsRegular() {
+		return false, nil
+	}
+	to := filepath.Join(src, "CNAME")
+	if _, err := os.Lstat(to); err == nil {
+		return false, nil
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return false, err
+	}
+	if _, err := copyIfChanged(from, to); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // isKept reports whether a file in docs without a source must stay.
 // CNAME is GitHub Pages' custom domain; piko matches it in any case.
 func isKept(rel string) bool {

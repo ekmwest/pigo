@@ -1,0 +1,2 @@
+src/index.html: missing layout "missing.html" in src/_layouts
+pigo build: 1 error, nothing written

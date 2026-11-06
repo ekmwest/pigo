@@ -36,6 +36,7 @@ Other files are copied as they are.
 
 Only files whose content changed are written. Files in docs/ without a
 source are deleted, except CNAME, .nojekyll and site_content.json.
+If docs/CNAME exists and src/CNAME doesn't, it is copied to src/.
 If any page has an error, all errors are printed and nothing is written.
 `)
 }
@@ -82,7 +83,9 @@ type Result struct {
 	// Problems are the errors found while rendering, each prefixed with
 	// its source file. If there are any, nothing was written.
 	Problems []string
-	Duration time.Duration
+	// CopiedCNAME means docs/CNAME was copied to the missing src/CNAME.
+	CopiedCNAME bool
+	Duration    time.Duration
 }
 
 // Build builds dir/src into dir/docs. The error is ErrNoSrc (wrapped) or
@@ -104,8 +107,14 @@ func Build(dir string) (Result, error) {
 		return res, nil
 	}
 
+	docs := filepath.Join(dir, "docs")
 	var err error
-	res.Written, res.Deleted, err = syncDocs(filepath.Join(dir, "docs"), s)
+	res.CopiedCNAME, err = copyCNAMEToSrc(src, docs)
+	if err != nil {
+		res.Duration = time.Since(start)
+		return res, fmt.Errorf("copy docs/CNAME to src/CNAME: %w", err)
+	}
+	res.Written, res.Deleted, err = syncDocs(docs, s)
 	res.Duration = time.Since(start)
 	return res, err
 }
@@ -131,6 +140,9 @@ func Print(cmd string, res Result, err error, stdout, stderr io.Writer) bool {
 		return false
 	}
 
+	if res.CopiedCNAME {
+		fmt.Fprintln(stdout, "Copied docs/CNAME to src/CNAME")
+	}
 	for _, d := range res.Deleted {
 		fmt.Fprintf(stdout, "deleted docs/%s\n", d)
 	}
