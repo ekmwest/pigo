@@ -44,7 +44,7 @@ func TestInjectReload(t *testing.T) {
 		"style.css":  "body { color: red }",
 		"a.txt":      "<p>not html</p>",
 	})
-	h := injectReload(newHandler(dir, log.New(io.Discard, "", 0)))
+	h := injectReload(NewHandler(dir, log.New(io.Discard, "", 0), LogAll))
 
 	tests := []struct {
 		name       string
@@ -113,9 +113,9 @@ func TestInjectReload(t *testing.T) {
 func TestWithReloadInjects(t *testing.T) {
 	dir := t.TempDir()
 	writeFiles(t, dir, map[string]string{"index.html": "<body>home</body>"})
-	b := newBroadcaster()
-	defer b.close()
-	srv := httptest.NewServer(withReload(newHandler(dir, log.New(io.Discard, "", 0)), b))
+	b := NewBroadcaster()
+	defer b.Close()
+	srv := httptest.NewServer(WithReload(NewHandler(dir, log.New(io.Discard, "", 0), LogAll), b))
 	defer srv.Close()
 
 	resp, err := http.Get(srv.URL + "/")

@@ -3,6 +3,7 @@ package build
 import (
 	"bytes"
 	"flag"
+	"io"
 	"io/fs"
 	"maps"
 	"os"
@@ -46,7 +47,7 @@ func testGolden(t *testing.T, caseDir string) {
 	beforeTimes := modTimes(t, docs)
 
 	var stdout, stderr bytes.Buffer
-	code := Build(dir, &stdout, &stderr)
+	code := buildAndPrint(dir, &stdout, &stderr)
 
 	stderrFile := filepath.Join(caseDir, "stderr.txt")
 	if exists(stderrFile) {
@@ -114,7 +115,7 @@ func TestUnchangedFilesNotRewritten(t *testing.T) {
 		"src/style.css":          "body {}",
 	})
 	var stdout, stderr bytes.Buffer
-	if code := Build(dir, &stdout, &stderr); code != 0 {
+	if code := buildAndPrint(dir, &stdout, &stderr); code != 0 {
 		t.Fatalf("first build: exit code %d, stderr: %s", code, stderr.String())
 	}
 
@@ -130,7 +131,7 @@ func TestUnchangedFilesNotRewritten(t *testing.T) {
 	// logo.png keeps its size, so its bytes must be compared.
 	writeFiles(t, dir, map[string]string{"src/about.md": "Bye", "src/logo.png": "PNG2"})
 	stdout.Reset()
-	if code := Build(dir, &stdout, &stderr); code != 0 {
+	if code := buildAndPrint(dir, &stdout, &stderr); code != 0 {
 		t.Fatalf("second build: exit code %d, stderr: %s", code, stderr.String())
 	}
 	if !strings.Contains(stdout.String(), "(2 written, 0 deleted)") {
@@ -147,7 +148,7 @@ func TestUnchangedFilesNotRewritten(t *testing.T) {
 func TestMissingSrc(t *testing.T) {
 	dir := t.TempDir()
 	var stdout, stderr bytes.Buffer
-	if code := Build(dir, &stdout, &stderr); code != 1 {
+	if code := buildAndPrint(dir, &stdout, &stderr); code != 1 {
 		t.Errorf("exit code = %d, want 1", code)
 	}
 	if !strings.Contains(stderr.String(), "no src folder in "+dir) || !strings.Contains(stderr.String(), "project folder") {
@@ -258,4 +259,13 @@ func modTimes(t *testing.T, dir string) map[string]time.Time {
 func exists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
+}
+
+// buildAndPrint builds dir like the build command and returns its exit code.
+func buildAndPrint(dir string, stdout, stderr io.Writer) int {
+	res, err := Build(dir)
+	if !Print("build", res, err, stdout, stderr) {
+		return 1
+	}
+	return 0
 }

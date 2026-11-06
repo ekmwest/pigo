@@ -13,7 +13,7 @@ pigo is a CLI tool written in Go.
 ## Commands
 
 - `pigo serve`: launch a static web server for the current folder on localhost (`-p` sets the port).
-    - Live reload is always on: browsers refresh when any file in the served folder is added, changed or deleted. Dotfiles and editor temp files are ignored. `--no-reload` turns it off.
+    - Live reload is always on: browsers refresh when any file in the served folder is added, changed or deleted. Dotfiles and editor temp files are ignored. `--no-reload` turns it off. The polling watcher lives in `internal/watch` (shared with dev).
     - Don't write to stdout or stderr in response to a file change or a reload (including request logs for the reload stream). If output is redirected to a file inside the served folder, each write is itself a change, causing an endless reload loop.
     - Caching is disabled on purpose: responses send `Cache-Control: no-store`, and conditional request headers (`If-Modified-Since`, `If-None-Match`) are ignored. Browsers cache by URL, and `localhost:<port>` points at a different folder every time serve is restarted elsewhere, so a revalidated copy (a 304) can be a page from another folder.
 - `pigo copy owner/repo [folder]`: copies the files of a GitHub repo (default branch, no git history) into a folder, like a project template (`internal/repocopy`).
@@ -27,10 +27,17 @@ pigo is a CLI tool written in Go.
     - No arguments or flags. Only `src/` is required; the top-level `src/_includes` and `src/_layouts` are optional and never copied.
     - Pages (`.html`, `.svg`, `.md`): flat frontmatter (no YAML library), markdown via goldmark (GFM, raw HTML allowed; `.md` becomes `.html`), `layout` with `{{ content }}`, `{{ name || default }}` variables, and include comments like `<!-- card.html, { src: "a.png" } -->`. Props are parsed, never evaluated. Other files are copied.
     - piko's regexes are ported as they are, with JavaScript semantics for `.`, `\s` and `trim()` (`jstext.go`). The lookahead in piko's `<main>` regex is hand-ported (`mainTagContent`).
+    - `build.Build` returns a `Result` (written count, deleted files, problems, duration) and prints nothing. `build.Print` prints it, so build and dev print the same lines.
     - All or nothing: everything is rendered in memory first. Any problem (missing layout/include, layout without `{{ content }}`, invalid props, include cycle, bad frontmatter line, output clash) is printed with its source file, nothing is written, exit 1.
-    - Writes a file only when its content differs, so unchanged files keep their timestamps (a future live-reloading `dev` depends on this). No timestamp logic, no force flag.
+    - Writes a file only when its content differs, so unchanged files keep their timestamps (dev's reload signal depends on this). No timestamp logic, no force flag.
     - Deletes files and folders in `docs/` without a source, except root `CNAME`, `.nojekyll` and `site_content.json`. Never writes to `src/`. Creates `docs/.nojekyll`, and writes `docs/site_content.json` (`type Page`) in piko's `JSON.stringify(x, null, 4)` format.
     - Golden tests: `internal/build/testdata/<case>/` holds `src/`, optionally `before/` (the existing `docs/`), and either the expected `docs/` plus `stdout.txt`, or `stderr.txt` for error cases. Run `go test ./internal/build -update` to regenerate, then review the diff.
+- `pigo dev`: builds `./src` into `./docs`, serves `./docs` with live reload, and rebuilds when `./src` changes (`internal/dev`). A Go port of piko's dev (https://github.com/learnpoint/piko/blob/main/dev.js), built from build and serve.
+    - Only `--port`, which works exactly like serve's. No `--no-reload` (that's what build + serve are for) and no arguments. `src/` is required (same error as build).
+    - Serves `docs/` with serve's handler (no-store, hidden dotfiles, no listings). Logs only failed requests (404, 5xx), never the reload stream.
+    - Watches only `src/` with `internal/watch`. Rebuilds run inside the watcher's callback, so they never overlap. The watcher ignores dotfiles and editor temp files, which build still copies, so a change to only such a file doesn't rebuild until something else changes.
+    - Reloads browsers only when a build wrote or deleted at least one file. There is no watcher on `docs/`: build's counts are the signal (`build.Result`).
+    - Build errors are printed, `docs/` stays as it was (build is all or nothing), nothing reloads. A failed first build still starts the server and watcher. After each build, it prints build's own lines (via `build.Print`).
 - `pigo version`: prints the version. It is set at build time with `-ldflags "-X main.version=vX.Y.Z"` (the `version` variable in `main.go`; release builds inject the git tag, `v` included). Without it, the output is `dev`.
 - `pigo help`: prints help documentation.
 - `pigo update`: self-updates the cli from the latest GitHub release (`releases/latest` tag; refuses on `dev`; plain inequality, no semver). Downloads the archive for GOOS/GOARCH and `checksums.txt` for that exact tag, verifies the sha256, and swaps the executable via a temp file next to it. On windows the running exe is renamed to `pigo.exe.old` first; a leftover `.old` is removed on the next update run.

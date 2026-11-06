@@ -11,24 +11,24 @@ import (
 // unlikely to clash with a real file.
 const reloadPath = "/_pigo/reload"
 
-// broadcaster streams a reload event over Server-Sent Events to every
+// Broadcaster streams a reload event over Server-Sent Events to every
 // connected browser each time notify is called.
-type broadcaster struct {
+type Broadcaster struct {
 	mu      sync.Mutex
 	clients map[chan struct{}]struct{}
 	done    chan struct{}
 	closed  bool
 }
 
-func newBroadcaster() *broadcaster {
-	return &broadcaster{
+func NewBroadcaster() *Broadcaster {
+	return &Broadcaster{
 		clients: make(map[chan struct{}]struct{}),
 		done:    make(chan struct{}),
 	}
 }
 
-// notify tells every connected browser to reload.
-func (b *broadcaster) notify() {
+// Notify tells every connected browser to reload.
+func (b *Broadcaster) Notify() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	for ch := range b.clients {
@@ -41,10 +41,10 @@ func (b *broadcaster) notify() {
 	}
 }
 
-// close ends all open streams and makes new ones end immediately. Streams
+// Close ends all open streams and makes new ones end immediately. Streams
 // never finish on their own, so without this http.Server.Shutdown would wait
 // for its full timeout.
-func (b *broadcaster) close() {
+func (b *Broadcaster) Close() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if !b.closed {
@@ -53,7 +53,7 @@ func (b *broadcaster) close() {
 	}
 }
 
-func (b *broadcaster) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (b *Broadcaster) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ch := make(chan struct{}, 1)
 	b.mu.Lock()
 	b.clients[ch] = struct{}{}
@@ -91,11 +91,11 @@ func (b *broadcaster) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// withReload serves reload events at reloadPath and everything else from
+// WithReload serves reload events at reloadPath and everything else from
 // next, with the reload script added to HTML pages. The reload stream
 // bypasses next's request logging on purpose: a log line per reload,
 // redirected into the served folder, would trigger the watcher again.
-func withReload(next http.Handler, b *broadcaster) http.Handler {
+func WithReload(next http.Handler, b *Broadcaster) http.Handler {
 	pages := injectReload(next)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == reloadPath {

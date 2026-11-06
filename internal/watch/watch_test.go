@@ -1,4 +1,4 @@
-package serve
+package watch
 
 import (
 	"context"
@@ -77,7 +77,7 @@ func TestScanMissingDir(t *testing.T) {
 	}
 }
 
-// startWatch runs watch on dir and returns a channel that receives a value
+// startWatch runs Watch on dir and returns a channel that receives a value
 // for every onChange call.
 func startWatch(t *testing.T, dir string, interval time.Duration) <-chan struct{} {
 	t.Helper()
@@ -85,7 +85,7 @@ func startWatch(t *testing.T, dir string, interval time.Duration) <-chan struct{
 	changes := make(chan struct{}, 10)
 	done := make(chan error, 1)
 	go func() {
-		done <- watch(ctx, dir, interval, func() { changes <- struct{}{} })
+		done <- Watch(ctx, dir, interval, func() { changes <- struct{}{} })
 	}()
 	t.Cleanup(func() {
 		cancel()
@@ -180,9 +180,22 @@ func TestWatch(t *testing.T) {
 	})
 
 	t.Run("missing dir returns error", func(t *testing.T) {
-		err := watch(context.Background(), filepath.Join(t.TempDir(), "missing"), interval, func() {})
+		err := Watch(context.Background(), filepath.Join(t.TempDir(), "missing"), interval, func() {})
 		if err == nil {
 			t.Error("err = nil, want an error")
 		}
 	})
+}
+
+func writeFiles(t *testing.T, dir string, files map[string]string) {
+	t.Helper()
+	for name, content := range files {
+		p := filepath.Join(dir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 }

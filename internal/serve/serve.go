@@ -18,14 +18,25 @@ import (
 	"time"
 
 	"github.com/ekmwest/pigo/internal/cli"
+	"github.com/ekmwest/pigo/internal/watch"
 )
 
+// DefaultPort is the port used when --port isn't given.
+const DefaultPort = 8080
+
 const (
-	host        = "127.0.0.1"
-	defaultPort = 8080
+	host = "127.0.0.1"
 	// Only the default port falls back; an explicit --port is used as given.
 	defaultPortTries = 10
 	shutdownTimeout  = 5 * time.Second
+)
+
+// RequestLog chooses which requests a handler logs.
+type RequestLog int
+
+const (
+	LogAll    RequestLog = iota
+	LogFailed            // only 404s and server errors
 )
 
 func Command() cli.Command {
@@ -54,7 +65,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fset := flag.NewFlagSet("serve", flag.ContinueOnError)
 	fset.SetOutput(stderr)
 	fset.Usage = func() {} // we print help ourselves, so it goes to the right stream
-	port := fset.Int("port", defaultPort, "")
+	port := fset.Int("port", DefaultPort, "")
 	noReload := fset.Bool("no-reload", false, "")
 	if err := fset.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -75,10 +86,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 
-	tries := defaultPortTries
+	portSet := false
 	fset.Visit(func(f *flag.Flag) {
 		if f.Name == "port" {
-			tries = 1
+			portSet = true
 		}
 	})
 
@@ -88,9 +99,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	ln, err := listen(*port, tries, func(addr string) (net.Listener, error) {
-		return net.Listen("tcp", addr)
-	})
+	ln, err := Listen(*port, portSet)
 	if err != nil {
 		fmt.Fprintf(stderr, "pigo serve: %v\n", err)
 		return 1
@@ -109,22 +118,34 @@ func run(args []string, stdout, stderr io.Writer) int {
 	// Ctrl+C kills the process instead of waiting for open requests.
 	context.AfterFunc(ctx, stop)
 
-	h := newHandler(dir, log.New(stdout, "", log.Ltime))
+	h := NewHandler(dir, log.New(stdout, "", log.Ltime), LogAll)
 	if !*noReload {
-		b := newBroadcaster()
-		context.AfterFunc(ctx, b.close)
-		h = withReload(h, b)
+		b := NewBroadcaster()
+		context.AfterFunc(ctx, b.Close)
+		h = WithReload(h, b)
 		go func() {
-			if err := watch(ctx, dir, pollInterval, b.notify); err != nil {
+			if err := watch.Watch(ctx, dir, watch.PollInterval, b.Notify); err != nil {
 				fmt.Fprintf(stderr, "pigo serve: live reload disabled: %v\n", err)
 			}
 		}()
 	}
-	if err := serve(ctx, ln, h, stdout); err != nil {
+	if err := Serve(ctx, ln, h, stdout); err != nil {
 		fmt.Fprintf(stderr, "pigo serve: %v\n", err)
 		return 1
 	}
 	return 0
+}
+
+// Listen listens on 127.0.0.1 at port. Unless portSet (the user chose the
+// port), the next ports up to defaultPortTries are tried when it's busy.
+func Listen(port int, portSet bool) (net.Listener, error) {
+	tries := defaultPortTries
+	if portSet {
+		tries = 1
+	}
+	return listen(port, tries, func(addr string) (net.Listener, error) {
+		return net.Listen("tcp", addr)
+	})
 }
 
 // listen tries port, port+1, ... until one succeeds or tries runs out.
@@ -145,7 +166,8 @@ func listen(port, tries int, listenFn func(addr string) (net.Listener, error)) (
 	return nil, fmt.Errorf("no free port between %d and %d: %w", port, port+tries-1, err)
 }
 
-func serve(ctx context.Context, ln net.Listener, h http.Handler, stdout io.Writer) error {
+// Serve serves h on ln until ctx is done, then shuts the server down.
+func Serve(ctx context.Context, ln net.Listener, h http.Handler, stdout io.Writer) error {
 	srv := &http.Server{Handler: h}
 	errc := make(chan error, 1)
 	go func() { errc <- srv.Serve(ln) }()
@@ -165,16 +187,21 @@ func serve(ctx context.Context, ln net.Listener, h http.Handler, stdout io.Write
 	return nil
 }
 
-func newHandler(dir string, logger *log.Logger) http.Handler {
+// NewHandler serves the files in dir without caching, dotfiles or
+// directory listings, and logs requests to logger as mode says.
+func NewHandler(dir string, logger *log.Logger, mode RequestLog) http.Handler {
 	files := http.FileServer(noListingFS{http.Dir(dir)})
-	return logRequests(logger, noCache(hideDotfiles(files)))
+	return logRequests(logger, mode, noCache(hideDotfiles(files)))
 }
 
-func logRequests(logger *log.Logger, next http.Handler) http.Handler {
+func logRequests(logger *log.Logger, mode RequestLog, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rec, r)
-		logger.Printf("%s %s %d", r.Method, r.URL.Path, rec.status)
+		failed := rec.status == http.StatusNotFound || rec.status >= 500
+		if mode == LogAll || failed {
+			logger.Printf("%s %s %d", r.Method, r.URL.Path, rec.status)
+		}
 	})
 }
 

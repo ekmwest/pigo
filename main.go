@@ -7,6 +7,7 @@ import (
 
 	"github.com/ekmwest/pigo/internal/build"
 	"github.com/ekmwest/pigo/internal/cli"
+	"github.com/ekmwest/pigo/internal/dev"
 	"github.com/ekmwest/pigo/internal/help"
 	"github.com/ekmwest/pigo/internal/repocopy"
 	"github.com/ekmwest/pigo/internal/serve"
@@ -29,6 +30,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	commands = []cli.Command{
 		help.Command(func() []cli.Command { return commands }),
 		build.Command(),
+		dev.Command(),
 		repocopy.Command(version),
 		serve.Command(),
 		update.Command(version),

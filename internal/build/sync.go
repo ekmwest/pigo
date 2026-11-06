@@ -17,17 +17,17 @@ const (
 	noJekyllFile    = ".nojekyll"
 )
 
-// syncDocs makes docs match s. Files are written only when their content
-// changed, so unchanged files keep their timestamps. It prints a line
-// for every deleted file to stdout.
-func syncDocs(docs string, s *site, stdout io.Writer) (written, deleted int, err error) {
+// syncDocs makes docs match s and returns the number of written files and
+// the deleted files. Files are written only when their content changed, so
+// unchanged files keep their timestamps.
+func syncDocs(docs string, s *site) (written int, deleted []string, err error) {
 	if err := os.MkdirAll(docs, 0o755); err != nil {
-		return 0, 0, err
+		return 0, nil, err
 	}
 
 	// Deleting first also clears the way when a path changes between file
 	// and folder.
-	deleted, err = deleteStale(docs, s, stdout)
+	deleted, err = deleteStale(docs, s)
 	if err != nil {
 		return 0, deleted, err
 	}
@@ -77,8 +77,9 @@ func syncDocs(docs string, s *site, stdout io.Writer) (written, deleted int, err
 	return written, deleted, nil
 }
 
-// deleteStale removes the files and folders in docs that have no source.
-func deleteStale(docs string, s *site, stdout io.Writer) (int, error) {
+// deleteStale removes the files and folders in docs that have no source
+// and returns the deleted files as slash paths relative to docs.
+func deleteStale(docs string, s *site) ([]string, error) {
 	wantFiles := map[string]bool{}
 	for _, f := range s.files {
 		wantFiles[f.path] = true
@@ -88,7 +89,7 @@ func deleteStale(docs string, s *site, stdout io.Writer) (int, error) {
 		wantDirs[d] = true
 	}
 
-	deleted := 0
+	var deleted []string
 	var staleDirs []string
 	err := filepath.WalkDir(docs, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -103,7 +104,7 @@ func deleteStale(docs string, s *site, stdout io.Writer) (int, error) {
 			return nil
 		}
 		if d.IsDir() {
-			// Walk into it anyway, so that each deleted file is printed.
+			// Walk into it anyway, so that each deleted file is reported.
 			if !wantDirs[rel] {
 				staleDirs = append(staleDirs, p)
 			}
@@ -115,8 +116,7 @@ func deleteStale(docs string, s *site, stdout io.Writer) (int, error) {
 		if err := os.Remove(p); err != nil {
 			return err
 		}
-		deleted++
-		fmt.Fprintf(stdout, "deleted docs/%s\n", rel)
+		deleted = append(deleted, rel)
 		return nil
 	})
 	if err != nil {

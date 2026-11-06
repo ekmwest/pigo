@@ -1,4 +1,4 @@
-package serve
+package watch
 
 import (
 	"context"
@@ -9,19 +9,20 @@ import (
 	"time"
 )
 
-const pollInterval = 300 * time.Millisecond
+// PollInterval is how often Watch checks the folder.
+const PollInterval = 300 * time.Millisecond
 
 type fileState struct {
 	modTime time.Time
 	size    int64
 }
 
-// watch polls dir every interval and calls onChange once the folder has
+// Watch polls dir every interval and calls onChange once the folder has
 // changed and then stayed quiet for a full interval, so a save that touches
 // several files (or a build writing many) results in a single call.
 // Polling is used instead of OS notifications to stay on the standard
 // library and behave the same on every platform and file system.
-func watch(ctx context.Context, dir string, interval time.Duration, onChange func()) error {
+func Watch(ctx context.Context, dir string, interval time.Duration, onChange func()) error {
 	prev, err := scan(dir)
 	if err != nil {
 		return err
@@ -88,9 +89,11 @@ func scan(dir string) (map[string]fileState, error) {
 	return files, nil
 }
 
-// ignored reports whether a file or folder name should not trigger a reload.
-// Dotfiles are skipped because the server doesn't serve them (see
-// hideDotfiles); the rest are temp files that editors write while saving.
+// ignored reports whether a file or folder name should not count as a change.
+// Dotfiles are skipped because serve doesn't serve them (see hideDotfiles);
+// the rest are temp files that editors write while saving. Build does copy
+// both kinds from src/, so dev doesn't rebuild when only those change; the
+// next other change does.
 func ignored(name string) bool {
 	if strings.HasPrefix(name, ".") {
 		return true

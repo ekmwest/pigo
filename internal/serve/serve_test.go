@@ -161,7 +161,7 @@ func TestHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.path, func(t *testing.T) {
 			var logs bytes.Buffer
-			h := newHandler(dir, log.New(&logs, "", 0))
+			h := NewHandler(dir, log.New(&logs, "", 0), LogAll)
 			rec := httptest.NewRecorder()
 			h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tt.path, nil))
 
@@ -190,7 +190,7 @@ func TestNoCacheAcrossFolders(t *testing.T) {
 	dirA := t.TempDir()
 	writeFiles(t, dirA, map[string]string{"index.html": "folder A"})
 	rec := httptest.NewRecorder()
-	newHandler(dirA, log.New(io.Discard, "", 0)).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	NewHandler(dirA, log.New(io.Discard, "", 0), LogAll).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	lastModified := rec.Header().Get("Last-Modified")
 	if lastModified == "" {
 		t.Fatal("folder A response has no Last-Modified")
@@ -206,7 +206,7 @@ func TestNoCacheAcrossFolders(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("If-Modified-Since", lastModified)
 	rec = httptest.NewRecorder()
-	newHandler(dirB, log.New(io.Discard, "", 0)).ServeHTTP(rec, req)
+	NewHandler(dirB, log.New(io.Discard, "", 0), LogAll).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
@@ -233,7 +233,7 @@ func TestServeShutdown(t *testing.T) {
 	var stdout bytes.Buffer
 	done := make(chan error, 1)
 	go func() {
-		done <- serve(ctx, ln, newHandler(dir, log.New(io.Discard, "", 0)), &stdout)
+		done <- Serve(ctx, ln, NewHandler(dir, log.New(io.Discard, "", 0), LogAll), &stdout)
 	}()
 
 	resp, err := http.Get("http://" + ln.Addr().String() + "/a.txt")
@@ -257,5 +257,19 @@ func TestServeShutdown(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "Shutting down") {
 		t.Errorf("stdout = %q, want it to contain %q", stdout.String(), "Shutting down")
+	}
+}
+
+func TestHandlerLogFailed(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{"a.txt": "hello"})
+
+	var logs bytes.Buffer
+	h := NewHandler(dir, log.New(&logs, "", 0), LogFailed)
+	for _, p := range []string{"/a.txt", "/missing"} {
+		h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, p, nil))
+	}
+	if got, want := logs.String(), "GET /missing 404\n"; got != want {
+		t.Errorf("log = %q, want %q", got, want)
 	}
 }

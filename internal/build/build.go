@@ -64,40 +64,81 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "pigo build: %v\n", err)
 		return 1
 	}
-	return Build(dir, stdout, stderr)
+	res, err := Build(dir)
+	if !Print("build", res, err, stdout, stderr) {
+		return 1
+	}
+	return 0
 }
 
-// Build builds dir/src into dir/docs and returns the process exit code.
-func Build(dir string, stdout, stderr io.Writer) int {
+// ErrNoSrc means the folder given to Build has no src folder.
+var ErrNoSrc = errors.New("no src folder")
+
+// Result describes what a build did.
+type Result struct {
+	Written int
+	// Deleted lists the deleted files as slash paths relative to docs/.
+	Deleted []string
+	// Problems are the errors found while rendering, each prefixed with
+	// its source file. If there are any, nothing was written.
+	Problems []string
+	Duration time.Duration
+}
+
+// Build builds dir/src into dir/docs. The error is ErrNoSrc (wrapped) or
+// a failure while writing docs/; problems in the source are reported in
+// the result instead.
+func Build(dir string) (Result, error) {
 	start := time.Now()
+	var res Result
 
 	src := filepath.Join(dir, "src")
 	if info, err := os.Stat(src); err != nil || !info.IsDir() {
-		fmt.Fprintf(stderr, "pigo build: no src folder in %s\n", dir)
-		fmt.Fprintln(stderr, "Run build from the project folder (the one that contains src/).")
-		return 1
+		return res, fmt.Errorf("%w in %s", ErrNoSrc, dir)
 	}
 
 	s, problems := render(src)
 	if len(problems) > 0 {
-		for _, p := range problems {
+		res.Problems = problems
+		res.Duration = time.Since(start)
+		return res, nil
+	}
+
+	var err error
+	res.Written, res.Deleted, err = syncDocs(filepath.Join(dir, "docs"), s)
+	res.Duration = time.Since(start)
+	return res, err
+}
+
+// Print prints the outcome of Build as the command cmd and reports
+// whether the build succeeded.
+func Print(cmd string, res Result, err error, stdout, stderr io.Writer) bool {
+	if errors.Is(err, ErrNoSrc) {
+		fmt.Fprintf(stderr, "pigo %s: %v\n", cmd, err)
+		fmt.Fprintf(stderr, "Run %s from the project folder (the one that contains src/).\n", cmd)
+		return false
+	}
+
+	if len(res.Problems) > 0 {
+		for _, p := range res.Problems {
 			fmt.Fprintln(stderr, p)
 		}
 		word := "errors"
-		if len(problems) == 1 {
+		if len(res.Problems) == 1 {
 			word = "error"
 		}
-		fmt.Fprintf(stderr, "pigo build: %d %s, nothing written\n", len(problems), word)
-		return 1
+		fmt.Fprintf(stderr, "pigo %s: %d %s, nothing written\n", cmd, len(res.Problems), word)
+		return false
 	}
 
-	written, deleted, err := syncDocs(filepath.Join(dir, "docs"), s, stdout)
+	for _, d := range res.Deleted {
+		fmt.Fprintf(stdout, "deleted docs/%s\n", d)
+	}
 	if err != nil {
-		fmt.Fprintf(stderr, "pigo build: %v\n", err)
-		return 1
+		fmt.Fprintf(stderr, "pigo %s: %v\n", cmd, err)
+		return false
 	}
-
 	fmt.Fprintf(stdout, "built docs/ in %d ms (%d written, %d deleted)\n",
-		time.Since(start).Milliseconds(), written, deleted)
-	return 0
+		res.Duration.Milliseconds(), res.Written, len(res.Deleted))
+	return true
 }

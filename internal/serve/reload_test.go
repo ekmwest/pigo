@@ -14,7 +14,7 @@ import (
 )
 
 // connect opens a reload stream on srv. When it returns, the response
-// headers have arrived, so the broadcaster has registered the client.
+// headers have arrived, so the Broadcaster has registered the client.
 func connect(t *testing.T, ctx context.Context, url string) *http.Response {
 	t.Helper()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url+reloadPath, nil)
@@ -65,13 +65,13 @@ func readEvent(t *testing.T, r *bufio.Reader) []string {
 	}
 }
 
-func clientCount(b *broadcaster) int {
+func clientCount(b *Broadcaster) int {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return len(b.clients)
 }
 
-func waitForClients(t *testing.T, b *broadcaster, want int) {
+func waitForClients(t *testing.T, b *Broadcaster, want int) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
 	for clientCount(b) != want {
@@ -84,10 +84,10 @@ func waitForClients(t *testing.T, b *broadcaster, want int) {
 
 func TestBroadcaster(t *testing.T) {
 	t.Run("headers", func(t *testing.T) {
-		b := newBroadcaster()
+		b := NewBroadcaster()
 		srv := httptest.NewServer(b)
 		defer srv.Close()
-		defer b.close()
+		defer b.Close()
 
 		resp := connect(t, context.Background(), srv.URL)
 		if got := resp.Header.Get("Content-Type"); got != "text/event-stream" {
@@ -99,15 +99,15 @@ func TestBroadcaster(t *testing.T) {
 	})
 
 	t.Run("notify reaches every client", func(t *testing.T) {
-		b := newBroadcaster()
+		b := NewBroadcaster()
 		srv := httptest.NewServer(b)
 		defer srv.Close()
-		defer b.close()
+		defer b.Close()
 
 		r1 := bufio.NewReader(connect(t, context.Background(), srv.URL).Body)
 		r2 := bufio.NewReader(connect(t, context.Background(), srv.URL).Body)
 
-		b.notify()
+		b.Notify()
 		want := []string{"event: reload", "data: reload"}
 		for _, r := range []*bufio.Reader{r1, r2} {
 			if got := readEvent(t, r); strings.Join(got, "\n") != strings.Join(want, "\n") {
@@ -116,21 +116,21 @@ func TestBroadcaster(t *testing.T) {
 		}
 
 		// A second notify must arrive too, not just the first.
-		b.notify()
+		b.Notify()
 		readEvent(t, r1)
 		readEvent(t, r2)
 	})
 
 	t.Run("notify without clients", func(t *testing.T) {
-		b := newBroadcaster()
-		b.notify()
+		b := NewBroadcaster()
+		b.Notify()
 	})
 
 	t.Run("disconnect unregisters client", func(t *testing.T) {
-		b := newBroadcaster()
+		b := NewBroadcaster()
 		srv := httptest.NewServer(b)
 		defer srv.Close()
-		defer b.close()
+		defer b.Close()
 
 		ctx, cancel := context.WithCancel(context.Background())
 		connect(t, ctx, srv.URL)
@@ -140,13 +140,13 @@ func TestBroadcaster(t *testing.T) {
 	})
 
 	t.Run("close ends streams", func(t *testing.T) {
-		b := newBroadcaster()
+		b := NewBroadcaster()
 		srv := httptest.NewServer(b)
 		defer srv.Close()
 
 		resp := connect(t, context.Background(), srv.URL)
-		b.close()
-		b.close() // closing twice must not panic
+		b.Close()
+		b.Close() // closing twice must not panic
 
 		done := make(chan error, 1)
 		go func() {
@@ -175,8 +175,8 @@ func TestWithReload(t *testing.T) {
 	writeFiles(t, dir, map[string]string{"a.txt": "hello"})
 
 	var logs strings.Builder
-	b := newBroadcaster()
-	srv := httptest.NewServer(withReload(newHandler(dir, log.New(&logs, "", 0)), b))
+	b := NewBroadcaster()
+	srv := httptest.NewServer(WithReload(NewHandler(dir, log.New(&logs, "", 0), LogAll), b))
 	defer srv.Close()
 
 	resp, err := http.Get(srv.URL + "/a.txt")
@@ -193,7 +193,7 @@ func TestWithReload(t *testing.T) {
 	if got := resp.Header.Get("Content-Type"); got != "text/event-stream" {
 		t.Errorf("Content-Type = %q, want %q", got, "text/event-stream")
 	}
-	b.close()
+	b.Close()
 	io.ReadAll(resp.Body)
 
 	// Only the file request is logged; the reload stream must not be.
@@ -203,17 +203,17 @@ func TestWithReload(t *testing.T) {
 }
 
 func TestServeShutdownWithReloadStream(t *testing.T) {
-	b := newBroadcaster()
+	b := NewBroadcaster()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	context.AfterFunc(ctx, b.close)
+	context.AfterFunc(ctx, b.Close)
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	done := make(chan error, 1)
-	go func() { done <- serve(ctx, ln, withReload(http.NotFoundHandler(), b), io.Discard) }()
+	go func() { done <- Serve(ctx, ln, WithReload(http.NotFoundHandler(), b), io.Discard) }()
 
 	connect(t, context.Background(), "http://"+ln.Addr().String())
 
