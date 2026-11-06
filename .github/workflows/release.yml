@@ -8,20 +8,18 @@ permissions:
   contents: write
 
 jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   release:
+    needs: ci
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-go@v6
         with:
-          go-version: stable
-
-      - name: Vet
-        run: go vet ./...
-
-      - name: Test
-        run: go test ./...
+          go-version-file: go.mod
 
       - name: Build and package
         run: |

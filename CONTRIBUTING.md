@@ -60,6 +60,8 @@ Push a version tag. The github workflow (`.github/workflows/release.yml`) will b
 
 Tags containing a `-` (like `v0.1.0-test`) are published as pre-releases.
 
+The release workflow first runs the CI checks on linux, windows and macos. If any of them fail, nothing is published, so there is no release to delete, only the tag (step 2 in [Deleting a release](#deleting-a-release)). Then fix the problem and tag again.
+
 
 ## Deleting a release
 
