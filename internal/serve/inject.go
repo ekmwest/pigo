@@ -7,32 +7,50 @@ import (
 	"strings"
 )
 
-// reloadScript reloads the page on a reload event. EventSource reconnects on
-// its own after the server restarts; the page then reloads too, so edits made
-// while the server was down show up.
-const reloadScript = `<script>
+// reloadScript returns the script that reloads a page served at version.
+// It holds a stream only while the page is visible (see Broadcaster), and
+// reloads on a reload event or when a new stream reports another version:
+// files changed while the page was hidden, or the server restarted.
+// EventSource reconnects on its own after a restart.
+func reloadScript(version string) string {
+	return `<script>
 (() => {
-	let connected = false;
-	const events = new EventSource("` + reloadPath + `");
-	events.addEventListener("reload", () => location.reload());
-	events.addEventListener("open", () => {
-		if (connected) location.reload();
-		connected = true;
+	const version = "` + version + `";
+	let events = null;
+	function connect() {
+		if (events || document.visibilityState !== "visible") return;
+		events = new EventSource("` + reloadPath + `");
+		events.addEventListener("version", (e) => {
+			if (e.data !== version) location.reload();
+		});
+		events.addEventListener("reload", () => location.reload());
+	}
+	function disconnect() {
+		if (events) events.close();
+		events = null;
+	}
+	document.addEventListener("visibilitychange", () => {
+		if (document.visibilityState === "visible") connect(); else disconnect();
 	});
+	connect();
 })();
 </script>
 `
+}
 
 // injectReload adds reloadScript to full HTML responses and HTML 404 pages,
 // so a page that is missing now reloads once it exists. Everything else,
 // including partial (206) responses, passes through unchanged.
-func injectReload(next http.Handler) http.Handler {
+func injectReload(next http.Handler, version func() string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			next.ServeHTTP(w, r)
 			return
 		}
-		iw := &injectWriter{ResponseWriter: w}
+		// Read the version before the file: if a change lands in between,
+		// the page has an older version and reloads once more, instead of
+		// showing old content under the new version.
+		iw := &injectWriter{ResponseWriter: w, script: reloadScript(version())}
 		next.ServeHTTP(iw, r)
 		iw.finish()
 	})
@@ -42,6 +60,7 @@ func injectReload(next http.Handler) http.Handler {
 // buffers the body so finish can insert the script and fix Content-Length.
 type injectWriter struct {
 	http.ResponseWriter
+	script      string
 	wroteHeader bool
 	status      int
 	inject      bool
@@ -74,7 +93,7 @@ func (w *injectWriter) finish() {
 	if !w.inject {
 		return
 	}
-	body := insertScript(w.buf.Bytes())
+	body := insertScript(w.buf.Bytes(), w.script)
 	h := w.Header()
 	h.Set("Content-Length", strconv.Itoa(len(body)))
 	// Byte ranges of the file on disk don't match the modified body.
@@ -83,16 +102,16 @@ func (w *injectWriter) finish() {
 	w.ResponseWriter.Write(body)
 }
 
-// insertScript puts reloadScript before the last </body>, or at the end if
-// there is none; browsers run a trailing script either way.
-func insertScript(body []byte) []byte {
+// insertScript puts script before the last </body>, or at the end if there
+// is none; browsers run a trailing script either way.
+func insertScript(body []byte, script string) []byte {
 	i := lastIndexFold(body, []byte("</body>"))
 	if i < 0 {
 		i = len(body)
 	}
-	out := make([]byte, 0, len(body)+len(reloadScript))
+	out := make([]byte, 0, len(body)+len(script))
 	out = append(out, body[:i]...)
-	out = append(out, reloadScript...)
+	out = append(out, script...)
 	return append(out, body[i:]...)
 }
 

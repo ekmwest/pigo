@@ -106,6 +106,8 @@ func TestBroadcaster(t *testing.T) {
 
 		r1 := bufio.NewReader(connect(t, context.Background(), srv.URL).Body)
 		r2 := bufio.NewReader(connect(t, context.Background(), srv.URL).Body)
+		readEvent(t, r1) // version
+		readEvent(t, r2)
 
 		b.Notify()
 		want := []string{"event: reload", "data: reload"}
@@ -119,6 +121,26 @@ func TestBroadcaster(t *testing.T) {
 		b.Notify()
 		readEvent(t, r1)
 		readEvent(t, r2)
+	})
+
+	t.Run("stream sends version first", func(t *testing.T) {
+		b := NewBroadcaster()
+		srv := httptest.NewServer(b)
+		defer srv.Close()
+		defer b.Close()
+
+		b.Notify() // the version must be current, not the initial one
+		r := bufio.NewReader(connect(t, context.Background(), srv.URL).Body)
+		want := []string{"event: version", "data: " + b.Version()}
+		if got := readEvent(t, r); strings.Join(got, "\n") != strings.Join(want, "\n") {
+			t.Errorf("first event = %q, want %q", got, want)
+		}
+
+		b.Notify()
+		want = []string{"event: reload", "data: reload"}
+		if got := readEvent(t, r); strings.Join(got, "\n") != strings.Join(want, "\n") {
+			t.Errorf("event after notify = %q, want %q", got, want)
+		}
 	})
 
 	t.Run("notify without clients", func(t *testing.T) {
@@ -168,6 +190,27 @@ func TestBroadcaster(t *testing.T) {
 			t.Errorf("read after close = %v, want EOF", err)
 		}
 	})
+}
+
+func TestBroadcasterVersion(t *testing.T) {
+	b := NewBroadcaster()
+	v := b.Version()
+	if again := b.Version(); again != v {
+		t.Errorf("version changed without notify: %q, then %q", v, again)
+	}
+	if strings.ContainsAny(v, `"\<>`) {
+		t.Errorf("version %q isn't safe in a script string", v)
+	}
+
+	seen := map[string]bool{v: true}
+	for i := 0; i < 3; i++ {
+		b.Notify()
+		v = b.Version()
+		if seen[v] {
+			t.Fatalf("version %q repeated after notify", v)
+		}
+		seen[v] = true
+	}
 }
 
 func TestWithReload(t *testing.T) {
