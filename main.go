@@ -11,7 +11,7 @@ import (
 	"github.com/ekmwest/pigo/internal/help"
 	"github.com/ekmwest/pigo/internal/repocopy"
 	"github.com/ekmwest/pigo/internal/serve"
-	"github.com/ekmwest/pigo/internal/update"
+	"github.com/ekmwest/pigo/internal/upgrade"
 
 	// Aliased because the name "version" is taken by the variable below,
 	// which must keep that name for -ldflags "-X main.version=...".
@@ -33,7 +33,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		dev.Command(),
 		repocopy.Command(version),
 		serve.Command(),
-		update.Command(version),
+		upgrade.Command(version),
 		versioncmd.Command(version),
 	}
 

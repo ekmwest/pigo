@@ -41,7 +41,7 @@ pigo is a CLI tool written in Go.
     - Build errors are printed, `docs/` stays as it was (build is all or nothing), nothing reloads. A failed first build still starts the server and watcher. After each build, it prints build's own lines (via `build.Print`).
 - `pigo version`: prints the version. It is set at build time with `-ldflags "-X main.version=vX.Y.Z"` (the `version` variable in `main.go`; release builds inject the git tag, `v` included). Without it, the output is `dev`.
 - `pigo help`: prints help documentation.
-- `pigo update`: self-updates the cli from the latest GitHub release (`releases/latest` tag; refuses on `dev`; plain inequality, no semver). Downloads the archive for GOOS/GOARCH and `checksums.txt` for that exact tag, verifies the sha256, and swaps the executable via a temp file next to it. On windows the running exe is renamed to `pigo.exe.old` first; a leftover `.old` is removed on the next update run.
+- `pigo upgrade`: self-upgrades the cli from the latest GitHub release (`releases/latest` tag; refuses on `dev`; plain inequality, no semver). Downloads the archive for GOOS/GOARCH and `checksums.txt` for that exact tag, verifies the sha256, and swaps the executable via a temp file next to it. On windows the running exe is renamed to `pigo.exe.old` first; a leftover `.old` is removed on the next upgrade run.
 
 
 ## Structure
