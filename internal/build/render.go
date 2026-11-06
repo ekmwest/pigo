@@ -190,8 +190,8 @@ func parseIncludeComment(comment string) (string, map[string]string, error) {
 	return name, props, nil
 }
 
-// parseProps parses { key: "value", ... }: unquoted keys and double
-// quoted values, kept exactly. piko evaluates props as JavaScript; this
+// parseProps parses { key: "value", ... }: unquoted keys and single or
+// double quoted values, kept exactly. piko evaluates props as JavaScript; this
 // accepts the subset that sites use, without evaluating anything.
 func parseProps(s string) (map[string]string, error) {
 	rest, ok := strings.CutPrefix(s, "{")
@@ -218,11 +218,13 @@ func parseProps(s string) (map[string]string, error) {
 		if !ok {
 			return nil, fmt.Errorf("expected \":\" after %s", key)
 		}
-		rest, ok = strings.CutPrefix(jsTrimLeft(rest), `"`)
-		if !ok {
-			return nil, fmt.Errorf("expected a double-quoted value for %s", key)
+		rest = jsTrimLeft(rest)
+		if rest == "" || (rest[0] != '"' && rest[0] != '\'') {
+			return nil, fmt.Errorf("expected a quoted value for %s", key)
 		}
-		end := strings.IndexAny(rest, `"\`)
+		quote := rest[0]
+		rest = rest[1:]
+		end := strings.IndexAny(rest, string(quote)+`\`)
 		if end == -1 {
 			return nil, fmt.Errorf("missing closing quote for %s", key)
 		}
