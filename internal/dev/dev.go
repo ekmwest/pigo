@@ -42,8 +42,8 @@ If a build fails, the errors are printed and the last good docs/ is
 still served. Fixing the source is enough to rebuild.
 
 Flags:
-  --port N   port to listen on (default 8080; if 8080 is busy,
-             the next free port up to 8089 is used)
+  -p, --port N   port to listen on (default 4444; if 4444 is busy,
+                 the next free port up to 4453 is used)
 `)
 }
 
@@ -51,7 +51,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fset := flag.NewFlagSet("dev", flag.ContinueOnError)
 	fset.SetOutput(stderr)
 	fset.Usage = func() {} // we print help ourselves, so it goes to the right stream
-	port := fset.Int("port", serve.DefaultPort, "")
+	var port int
+	fset.IntVar(&port, "port", serve.DefaultPort, "")
+	fset.IntVar(&port, "p", serve.DefaultPort, "")
 	if err := fset.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			printHelp(stdout)
@@ -66,13 +68,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 		printHelp(stderr)
 		return 2
 	}
-	if *port < 1 || *port > 65535 {
-		fmt.Fprintf(stderr, "pigo dev: invalid port %d\n", *port)
+	if port < 1 || port > 65535 {
+		fmt.Fprintf(stderr, "pigo dev: invalid port %d\n", port)
 		return 2
 	}
 	portSet := false
 	fset.Visit(func(f *flag.Flag) {
-		if f.Name == "port" {
+		if f.Name == "port" || f.Name == "p" {
 			portSet = true
 		}
 	})
@@ -91,7 +93,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	ln, err := serve.Listen(*port, portSet)
+	ln, err := serve.Listen(port, portSet)
 	if err != nil {
 		fmt.Fprintf(stderr, "pigo dev: %v\n", err)
 		return 1
@@ -99,8 +101,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	docs := filepath.Join(dir, "docs")
 	actual := ln.Addr().(*net.TCPAddr).Port
-	if actual != *port {
-		fmt.Fprintf(stdout, "Port %d is in use, using %d.\n", *port, actual)
+	if actual != port {
+		fmt.Fprintf(stdout, "Port %d is in use, using %d.\n", port, actual)
 	}
 	fmt.Fprintf(stdout, "Serving %s at http://localhost:%d\n", docs, actual)
 	fmt.Fprintln(stdout, "Press Ctrl+C to stop.")

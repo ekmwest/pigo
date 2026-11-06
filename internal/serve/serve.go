@@ -24,7 +24,7 @@ import (
 )
 
 // DefaultPort is the port used when --port isn't given.
-const DefaultPort = 8080
+const DefaultPort = 4444
 
 const (
 	host = "127.0.0.1"
@@ -57,9 +57,9 @@ Serve the files in the current folder over HTTP on localhost.
 Open pages reload when a file in the folder changes.
 
 Flags:
-  --port N      port to listen on (default 8080; if 8080 is busy,
-                the next free port up to 8089 is used)
-  --no-reload   don't reload pages when files change
+  -p, --port N      port to listen on (default 4444; if 4444 is busy,
+                    the next free port up to 4453 is used)
+      --no-reload   don't reload pages when files change
 `)
 }
 
@@ -67,7 +67,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 	fset := flag.NewFlagSet("serve", flag.ContinueOnError)
 	fset.SetOutput(stderr)
 	fset.Usage = func() {} // we print help ourselves, so it goes to the right stream
-	port := fset.Int("port", DefaultPort, "")
+	var port int
+	fset.IntVar(&port, "port", DefaultPort, "")
+	fset.IntVar(&port, "p", DefaultPort, "")
 	noReload := fset.Bool("no-reload", false, "")
 	if err := fset.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -83,14 +85,14 @@ func run(args []string, stdout, stderr io.Writer) int {
 		printHelp(stderr)
 		return 2
 	}
-	if *port < 1 || *port > 65535 {
-		fmt.Fprintf(stderr, "pigo serve: invalid port %d\n", *port)
+	if port < 1 || port > 65535 {
+		fmt.Fprintf(stderr, "pigo serve: invalid port %d\n", port)
 		return 2
 	}
 
 	portSet := false
 	fset.Visit(func(f *flag.Flag) {
-		if f.Name == "port" {
+		if f.Name == "port" || f.Name == "p" {
 			portSet = true
 		}
 	})
@@ -101,15 +103,15 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	ln, err := Listen(*port, portSet)
+	ln, err := Listen(port, portSet)
 	if err != nil {
 		fmt.Fprintf(stderr, "pigo serve: %v\n", err)
 		return 1
 	}
 
 	actual := ln.Addr().(*net.TCPAddr).Port
-	if actual != *port {
-		fmt.Fprintf(stdout, "Port %d is in use, using %d.\n", *port, actual)
+	if actual != port {
+		fmt.Fprintf(stdout, "Port %d is in use, using %d.\n", port, actual)
 	}
 	fmt.Fprintf(stdout, "Serving %s at http://localhost:%d\n", dir, actual)
 	fmt.Fprintln(stdout, "Press Ctrl+C to stop.")

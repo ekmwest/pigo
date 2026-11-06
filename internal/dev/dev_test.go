@@ -74,6 +74,9 @@ func TestRun(t *testing.T) {
 	if code := run([]string{"--port", "0"}, &stdout, &stderr); code != 2 {
 		t.Errorf("port 0: exit code = %d, want 2", code)
 	}
+	if code := run([]string{"-p", "0"}, &stdout, &stderr); code != 2 {
+		t.Errorf("-p 0: exit code = %d, want 2", code)
+	}
 	stdout.Reset()
 	if code := run([]string{"-h"}, &stdout, &stderr); code != 0 || !strings.Contains(stdout.String(), "Usage: pigo dev") {
 		t.Errorf("-h: exit code %d, stdout %q", code, stdout.String())

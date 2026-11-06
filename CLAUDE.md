@@ -12,7 +12,7 @@ pigo is a CLI tool written in Go.
 
 ## Commands
 
-- `pigo serve`: launch a static web server for the current folder on localhost (`-p` sets the port).
+- `pigo serve`: launch a static web server for the current folder on localhost (`-p, --port`; an explicit port is used as given, otherwise 4444 falls back to the next free port up to 4453).
     - Live reload is always on: browsers refresh when any file in the served folder is added, changed or deleted. Dotfiles and editor temp files are ignored. `--no-reload` turns it off. The polling watcher lives in `internal/watch` (shared with dev).
     - Only visible tabs hold a reload stream (SSE): the script opens it while `document.visibilityState` is visible and closes it on `visibilitychange` to hidden, because browsers allow only 6 HTTP/1.1 connections per host. The Broadcaster keeps a version (server start time + a counter `Notify` increments). It is written into the injected script and sent as the first event of every stream. A page reloads on a reload event, or when a stream's version differs from its own. That covers changes missed while hidden and server restarts.
     - Don't write to stdout or stderr in response to a file change or a reload (including request logs for the reload stream). If output is redirected to a file inside the served folder, each write is itself a change, causing an endless reload loop.
@@ -35,7 +35,7 @@ pigo is a CLI tool written in Go.
     - Deletes files and folders in `docs/` without a source, except root `CNAME`, `.nojekyll` and `site_content.json`. Never writes to `src/`. Creates `docs/.nojekyll`, and writes `docs/site_content.json` (`type Page`) in piko's `JSON.stringify(x, null, 4)` format.
     - Golden tests: `internal/build/testdata/<case>/` holds `src/`, optionally `before/` (the existing `docs/`), and either the expected `docs/` plus `stdout.txt`, or `stderr.txt` for error cases. Run `go test ./internal/build -update` to regenerate, then review the diff.
 - `pigo dev`: builds `./src` into `./docs`, serves `./docs` with live reload, and rebuilds when `./src` changes (`internal/dev`). A Go port of piko's dev (https://github.com/learnpoint/piko/blob/main/dev.js), built from build and serve.
-    - Only `--port`, which works exactly like serve's. No `--no-reload` (that's what build + serve are for) and no arguments. `src/` is required (same error as build).
+    - Only `-p, --port`, which works exactly like serve's. No `--no-reload` (that's what build + serve are for) and no arguments. `src/` is required (same error as build).
     - Serves `docs/` with serve's handler (no-store, hidden dotfiles, no listings). Logs only failed requests (404, 5xx), never the reload stream.
     - Watches only `src/` with `internal/watch`. Rebuilds run inside the watcher's callback, so they never overlap. The watcher ignores dotfiles and editor temp files, which build still copies, so a change to only such a file doesn't rebuild until something else changes.
     - Reloads browsers only when a build wrote or deleted at least one file. There is no watcher on `docs/`: build's counts are the signal (`build.Result`).

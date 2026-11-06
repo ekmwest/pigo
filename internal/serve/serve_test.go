@@ -33,6 +33,7 @@ func TestRun(t *testing.T) {
 		{name: "extra argument", args: []string{"extra"}, wantCode: 2, wantStderr: "unexpected arguments"},
 		{name: "port too low", args: []string{"--port", "0"}, wantCode: 2, wantStderr: "invalid port 0"},
 		{name: "port too high", args: []string{"--port", "70000"}, wantCode: 2, wantStderr: "invalid port 70000"},
+		{name: "short port too low", args: []string{"-p", "0"}, wantCode: 2, wantStderr: "invalid port 0"},
 	}
 
 	for _, tt := range tests {
@@ -88,21 +89,21 @@ func TestListen(t *testing.T) {
 		wantAddr string
 		wantErr  string // substring; "" means no error
 	}{
-		{name: "first port free", tries: 10, wantAddr: "127.0.0.1:8080"},
-		{name: "falls back", tries: 10, busy: []string{"127.0.0.1:8080", "127.0.0.1:8081"}, wantAddr: "127.0.0.1:8082"},
-		{name: "explicit port busy", tries: 1, busy: []string{"127.0.0.1:8080"}, wantErr: "listen 127.0.0.1:8080: address in use"},
+		{name: "first port free", tries: 10, wantAddr: "127.0.0.1:4444"},
+		{name: "falls back", tries: 10, busy: []string{"127.0.0.1:4444", "127.0.0.1:4445"}, wantAddr: "127.0.0.1:4446"},
+		{name: "explicit port busy", tries: 1, busy: []string{"127.0.0.1:4444"}, wantErr: "listen 127.0.0.1:4444: address in use"},
 		{
 			name:  "all ports busy",
 			tries: 3,
-			busy:  []string{"127.0.0.1:8080", "127.0.0.1:8081", "127.0.0.1:8082"},
+			busy:  []string{"127.0.0.1:4444", "127.0.0.1:4445", "127.0.0.1:4446"},
 			// The last attempt's error is the one reported.
-			wantErr: "no free port between 8080 and 8082: listen 127.0.0.1:8082",
+			wantErr: "no free port between 4444 and 4446: listen 127.0.0.1:4446",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ln, err := listen(8080, tt.tries, fakeListen(tt.busy...))
+			ln, err := listen(DefaultPort, tt.tries, fakeListen(tt.busy...))
 
 			if tt.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
