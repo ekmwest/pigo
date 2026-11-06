@@ -21,6 +21,7 @@ import (
 // excludes everything under it.
 var excluded = []string{
 	"LICENSE",
+	"LICENCE",
 	"CNAME",
 	"README.md",
 	"CODE_OF_CONDUCT.md",
